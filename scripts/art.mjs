@@ -1,0 +1,28 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+mkdirSync('public/images', { recursive: true });
+const palettes = {
+  rose: ['#eacac6', '#c89298', '#f3e3d7'],
+  cloud: ['#e8e1d6', '#b9ae9d', '#e9dfd1'],
+  sage: ['#b7c0ad', '#7b8d79', '#eee9df'],
+  pearl: ['#eee4d3', '#c2af91', '#e8dcd0'],
+  bloom: ['#e9bfc4', '#b77e90', '#eee2d7'],
+  moon: ['#738091', '#424e64', '#e7dfd5'],
+  sunday: ['#d9c5a7', '#b19c7d', '#f1e7d9'],
+  petal: ['#c99994', '#a16f6b', '#eee1d6'],
+};
+function garment(fill, stroke, dress = false, pattern = false) {
+  return dress
+    ? `<path d="M204 137 L213 93 L228 93 L231 143 Q250 160 269 143 L272 93 L287 93 L296 137 L341 397 Q250 430 159 397 Z" fill="${fill}" stroke="${stroke}" stroke-width="2"/><path d="M204 137 Q250 196 296 137 M188 278 Q250 295 313 278" fill="none" stroke="${stroke}" opacity=".6"/><path d="M218 187 L204 373 M282 187 L299 373" stroke="${stroke}" opacity=".25"/>`
+    : `<path d="M190 108 L222 93 L278 93 L310 108 L351 189 L314 211 L296 171 L301 299 Q250 315 199 299 L204 171 L186 211 L149 189 Z" fill="${fill}" stroke="${stroke}" stroke-width="2"/><path d="M222 93 L250 128 L278 93 L291 122 L264 157 L250 140 L236 157 L209 122 Z" fill="${fill}" stroke="${stroke}" stroke-width="2"/><path d="M250 140 V306 M155 180 L189 199 M311 199 L345 180 M201 285 Q250 298 299 285" fill="none" stroke="${stroke}" stroke-width="2"/><path d="M267 171 H289 V198 Q278 205 267 198Z" fill="none" stroke="${stroke}" stroke-width="1.8"/>${[174, 210, 246, 281].map((y) => `<circle cx="254" cy="${y}" r="2.5" fill="${stroke}"/>`).join('')}<path d="M204 321 Q250 329 296 321 L315 461 L263 466 L250 365 L237 466 L185 461Z" fill="${fill}" stroke="${stroke}" stroke-width="2"/><path d="M205 332 Q250 339 295 332 M186 449 L238 454 M262 454 L314 449" stroke="${stroke}" fill="none" stroke-width="2"/><path d="M250 332 Q225 350 232 336 Q240 324 250 332 Q271 351 269 336 Q262 326 250 332" fill="none" stroke="${stroke}" stroke-width="1.5"/>${pattern ? Array.from({ length: 15 }, (_, i) => `<g transform="translate(${215 + (i % 3) * 27},${175 + Math.floor(i / 3) * 24})"><path d="M-3 0 Q0 -7 3 0 Q8 3 2 5 Q0 9 -2 5 Q-8 3 -3 0" fill="#f5e2dc" opacity=".7"/></g>`).join('') : ''}`;
+}
+for (const [name, [fill, stroke, bg]] of Object.entries(palettes)) {
+  writeFileSync(
+    `public/images/${name}.svg`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="500" height="600" viewBox="0 0 500 600"><defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="${bg}"/><stop offset="1" stop-color="#f9f3ed"/></linearGradient><filter id="shadow"><feDropShadow dx="6" dy="10" stdDeviation="9" flood-color="#765845" flood-opacity=".15"/></filter><pattern id="grain" width="5" height="5" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r=".5" fill="#9b8171" opacity=".08"/></pattern></defs><rect width="500" height="600" fill="url(#bg)"/><path d="M0 65 Q150 95 210 0 M350 600 Q390 400 500 340" fill="none" stroke="#fff9f0" stroke-width="45" opacity=".4"/><ellipse cx="260" cy="505" rx="139" ry="17" fill="#9a8070" opacity=".07"/><g filter="url(#shadow)" transform="rotate(-5 250 280)">${garment(fill, stroke, name === 'pearl' || name === 'petal', name === 'bloom')}</g><g transform="translate(395 455) rotate(20)" stroke="#a69e7a" fill="none" opacity=".65"><path d="M0 90 Q-20 25 15 -20"/><path d="M-3 40 Q-40 20 -18 5 Q0 13 -3 40 M-3 25 Q28 0 23 -11 Q4 -10 -3 25 M-2 63 Q27 41 22 29 Q1 31 -2 63" fill="#b7b99c" stroke="none"/></g><rect width="500" height="600" fill="url(#grain)"/></svg>`,
+  );
+}
+writeFileSync(
+  'public/images/hero.svg',
+  `<svg xmlns="http://www.w3.org/2000/svg" width="700" height="760" viewBox="0 0 700 760"><defs><linearGradient id="wall" x2="1" y2="1"><stop stop-color="#ddc8b9"/><stop offset="1" stop-color="#f2e7d8"/></linearGradient><linearGradient id="bed" y2="1" x2=".4"><stop stop-color="#f7f0e5"/><stop offset="1" stop-color="#dfcdbc"/></linearGradient><filter id="s"><feDropShadow dx="9" dy="13" stdDeviation="12" flood-color="#755843" flood-opacity=".18"/></filter></defs><rect width="700" height="760" fill="url(#wall)"/><path d="M470 0 V340 M555 0 V340 M640 0 V340" stroke="#f9f0df" stroke-width="36" opacity=".28"/><path d="M0 400 Q310 320 700 405 V760 H0Z" fill="url(#bed)"/><path d="M0 525 Q220 485 700 545 M0 670 Q360 575 700 665" fill="none" stroke="#fcf6ed" stroke-width="30" opacity=".6"/><g transform="translate(65 65) rotate(-12 280 300)" filter="url(#s)"><rect x="35" y="40" width="410" height="230" rx="30" fill="#f9f3e8"/><rect x="48" y="52" width="384" height="205" rx="23" fill="none" stroke="#e4d9c9" stroke-width="2"/></g><g transform="translate(72 120) scale(1.16) rotate(9 250 280)" filter="url(#s)">${garment('#dfb2b0', '#b58183')}</g><ellipse cx="593" cy="457" rx="60" ry="20" fill="#ac866c" opacity=".18"/><path d="M546 362 L638 362 L630 428 Q592 465 553 428Z" fill="#eee0c9"/><ellipse cx="592" cy="362" rx="46" ry="13" fill="#f7eddb"/><ellipse cx="592" cy="362" rx="35" ry="8" fill="#a67b59"/><path d="M635 373 Q675 368 669 397 Q664 418 632 410" stroke="#eee0c9" stroke-width="12" fill="none"/><g transform="translate(598 165)" stroke="#8a9777" stroke-width="3" fill="none"><path d="M0 110 Q-25 20 12 -53"/><path d="M-10 55 Q-60 30 -38 10 Q-16 17 -10 55 M-12 20 Q27 0 23 -28 Q-4 -21 -12 20 M-7 82 Q31 61 30 41 Q0 45 -7 82" fill="#a7b294" stroke="none"/></g><path d="M566 258 H627 L619 326 Q595 342 574 326Z" fill="#cdb39a"/><text x="36" y="715" font-family="Georgia" font-style="italic" font-size="18" fill="#9b7f6b">a softer kind of everyday.</text></svg>`,
+);
+console.log('Created original SVG garment illustrations and hero.');

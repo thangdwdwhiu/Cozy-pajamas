@@ -1,0 +1,22 @@
+[Unit]
+Description=Cozy pajamas Next.js and expiry worker
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=cozy
+Group=cozy
+WorkingDirectory=/srv/cozy
+Environment=NODE_ENV=production
+Environment=WORKER_APP_URL=http://127.0.0.1:3000
+ExecStart=/usr/bin/node /srv/cozy/scripts/run.mjs start
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

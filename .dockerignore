@@ -1,0 +1,10 @@
+node_modules
+.next
+.cache
+.env*
+!.env.example
+.git
+uploads
+backups
+docs/screenshots
+*.tsbuildinfo
