@@ -14,7 +14,7 @@ Tài liệu dành cho mã nguồn hiện tại, cập nhật 07/11/2026. Quy tr�
 
 Đăng nhập của cửa hàng do ứng dụng quản lý; không cần tạo người dùng trong Supabase Auth. Không dùng khóa `anon` cho database của ứng dụng.
 
-`vercel.json` đã cấu hình cron mỗi phút, phù hợp gói hỗ trợ lịch này. Vercel Hobby dành cho mục đích cá nhân phi thương mại và cron Hobby chỉ chạy hằng ngày; cửa hàng kinh doanh nên chọn gói phù hợp, ví dụ Pro. Không đổi cron sang hằng ngày rồi coi cơ chế hoàn kho sau 30 phút vẫn đúng. Nếu chỉ thử Hobby, bỏ cấu hình `crons` và dùng scheduler bên ngoài gọi endpoint mỗi phút với Bearer secret; tự chịu trách nhiệm kiểm tra scheduler hoạt động. Xem [gói Vercel](https://vercel.com/pricing) và [giới hạn Cron](https://vercel.com/docs/cron-jobs/manage-cron-jobs).
+`vercel.json` hiện dùng cron hằng ngày (`0 0 * * *`), phù hợp giới hạn lịch Hobby. Lịch này không bảo đảm hoàn kho ngay sau 30 phút. Để kiểm thử đầy đủ cơ chế hết hạn trên Hobby, cấu hình scheduler bên ngoài gọi `GET https://DOMAIN/api/cron/expire` mỗi phút, kèm header `Authorization: Bearer GIA_TRI_CRON_SECRET`; giữ secret ở cấu hình riêng của scheduler. Kiểm tra response 200 và lịch sử chạy. Nếu dùng gói hỗ trợ cron mỗi phút, đổi schedule thành `* * * * *`. Hobby dành cho mục đích cá nhân phi thương mại; xem [gói Vercel](https://vercel.com/pricing) và [giới hạn Cron](https://vercel.com/docs/cron-jobs/manage-cron-jobs).
 
 ## 2. Chuẩn bị mã nguồn lên GitHub
 
@@ -114,7 +114,7 @@ Muốn dữ liệu minh họa trên staging: sau khi server khởi tạo xong, c
 
 1. Vercel → **Add New → Project** → chọn repository.
 2. Framework Preset: **Next.js**; Root Directory: thư mục chứa `package.json` (repo hiện tại là root).
-3. Node.js: **22.x**. Build command `npm run build`, install command `npm ci --cache /tmp/npm-cache`. Để Output Directory mặc định, không nhập `.next/standalone`.
+3. Node.js: **22.x**. Build command `npm run build`, install command `npm ci --include=dev --include=optional --cache /tmp/npm-cache`. Để Output Directory mặc định, không nhập `.next/standalone`. Nếu Dashboard có Install Command override, tắt override để dùng vercel.json hoặc sửa đúng lệnh này.
 4. `vercel.json` đã có install command Linux để không dùng đường cache ổ D trong `.npmrc`.
 5. Thêm Environment Variables cho **Production** theo bảng trên. Cần ADMIN_EMAIL/ADMIN_PASSWORD ở lần khởi động đầu để tự tạo Admin; có thể bỏ ADMIN_PASSWORD rồi redeploy sau khi tạo xong. Không thêm `NODE_ENV=development`, `UPLOAD_DIR` Windows hoặc mật khẩu PostgreSQL local.
 6. `DATABASE_URL` dùng Direct và `AUTO_MIGRATE=true` phải có trên runtime. Nếu dùng `DIRECT_DATABASE_URL`, cũng thêm biến này trên runtime và trỏ đúng database. Preview phải dùng database riêng.
@@ -145,6 +145,17 @@ Nếu tên URL Vercel thực tế khác dự kiến, cập nhật APP_URL theo U
 - Làm theo [PAYMENTS.md](PAYMENTS.md) để cấu hình webhook; vẫn giữ live=false đến khi sẵn sàng kiểm chứng.
 
 ## 10. Cập nhật và khắc phục lỗi
+
+### Build báo thiếu TypeScript sau khi đã compiled successfully
+
+TypeScript và các gói `@types/*` đã nằm trong `devDependencies`. Build cần cài nhóm này dù runtime chạy production. Nếu đặt `NODE_ENV=production`, `NPM_CONFIG_PRODUCTION=true` hoặc `NPM_CONFIG_OMIT=dev` trong Environment Variables, npm có thể bỏ chúng. [Giải thích của Vercel](https://vercel.com/kb/guide/dependencies-from-package-json-missing-after-install).
+
+1. Push bản mới có Install Command `npm ci --include=dev --include=optional --cache /tmp/npm-cache` trong vercel.json. `optional` bảo đảm cài binary phù hợp hệ điều hành của TypeScript 7/Next/sharp.
+2. Settings → Build and Deployment → Install Command: tắt override cũ hoặc dùng đúng lệnh trên. Build Command giữ `npm run build`.
+3. Settings → Environment Variables: bỏ NODE_ENV do bạn tự thêm, NPM_CONFIG_PRODUCTION và NPM_CONFIG_OMIT nếu đang ép bỏ dev. Không đặt NODE_ENV=development để chữa lỗi build; Next tự chọn production khi build.
+4. Redeploy commit mới, bỏ chọn sử dụng Build Cache. Kiểm tra log Install Command có `--include=dev` rồi bước TypeScript hoàn tất.
+
+Cảnh báo `Unknown env config "cache-dir"` không phải nguyên nhân dừng build trong log này. Repository không khai báo cache-dir. Nếu tự thêm NPM_CONFIG_CACHE_DIR trong Vercel, bỏ biến đó; lệnh install đã dùng `--cache` hợp lệ. Không xóa tsconfig.json hoặc bật ignoreBuildErrors để né kiểm tra TypeScript.
 
 Thay source → chạy test/build local → push Git. Nếu có migration mới, backup Supabase trước khi deploy; server tự áp dụng khi khởi động. Kiểm tra tương thích với instance cũ đang chạy, dùng maintenance window nếu thay đổi phá vỡ schema. Dùng Preview với database/bucket riêng; không cho preview ghi lên database bán hàng.
 
