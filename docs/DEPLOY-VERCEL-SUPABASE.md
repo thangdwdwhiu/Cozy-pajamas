@@ -43,8 +43,9 @@ Thay URL bằng repository của bạn. Nếu đã có Git/remote, dùng cấu h
 1. Đăng nhập Supabase → **New project**.
 2. Đặt tên, chọn vùng gần người mua/Vercel (ví dụ Singapore nếu tài khoản có vùng này), đặt mật khẩu database riêng và lưu trong trình quản lý mật khẩu.
 3. Đợi project sẵn sàng → **Connect**.
-4. Sao chép URI **Transaction pooler**, cổng `6543`, vào `DATABASE_URL` cho Vercel.
-5. Sao chép URI **Direct connection**, cổng `5432`, vào `DIRECT_DATABASE_URL` để chạy migration. Nếu máy Windows/mạng không có IPv6, dùng **Session pooler** cổng `5432` cho thao tác quản trị kết nối đơn; không dùng transaction pooler để chạy migrations.
+4. Chọn **Direct connection**, sao chép URI cổng `5432` vào `DATABASE_URL`. Dạng URI: `postgresql://postgres:MAT_KHAU_DA_ENCODE@db.PROJECT_REF.supabase.co:5432/postgres`.
+5. Đặt `AUTO_MIGRATE=true`. Để trống `DIRECT_DATABASE_URL` khi runtime đã dùng Direct; nếu điền thì phải trỏ cùng database/project với `DATABASE_URL`. Server tự tạo bảng khi khởi động, không cần SQL Editor hoặc lệnh migration.
+6. Direct mặc định cần mạng IPv6. Môi trường chạy không có IPv6 phải có Supabase IPv4 add-on để tiếp tục dùng Direct. Kiểm tra mạng thực tế của Vercel/VPS; sửa code không thể thay thế đường mạng. Session pooler cổng 5432 là lựa chọn thay thế nếu bạn quyết định không dùng Direct; không dùng transaction pooler 6543 cho tự tạo bảng.
 
 Không tự suy đoán hostname hoặc username: sao chép từ Connect. Mật khẩu chứa ký tự đặc biệt phải URL-encode trong URI. Database của Supabase thường tên `postgres`; không chạy `npm run db:setup` để tạo `cozy_pajamas` trên Supabase. App dùng database đã có.
 
@@ -77,8 +78,9 @@ Script tạo file mới từ `.env.example`, sinh mật khẩu Admin, cron secre
 | Biến                        | Điền gì                                                                       |
 | --------------------------- | ----------------------------------------------------------------------------- |
 | `APP_URL`                   | `https://TEN-PROJECT.vercel.app` hoặc domain chính thức, không thêm đường dẫn |
-| `DATABASE_URL`              | Transaction pooler Supabase                                                   |
-| `DIRECT_DATABASE_URL`       | Direct URI hoặc session URI phù hợp cho migration                             |
+| `DATABASE_URL`              | Direct connection Supabase cổng 5432                                          |
+| `DIRECT_DATABASE_URL`       | Để trống hoặc cùng Direct URI, cùng project/database                          |
+| `AUTO_MIGRATE`              | `true`: tự tạo/cập nhật bảng khi server khởi động                             |
 | `MEDIA_STORAGE`             | `supabase`                                                                    |
 | `SUPABASE_URL`              | `https://PROJECT-REF.supabase.co`                                             |
 | `SUPABASE_STORAGE_BUCKET`   | `product-images`                                                              |
@@ -91,25 +93,20 @@ Script tạo file mới từ `.env.example`, sinh mật khẩu Admin, cron secre
 
 `AUTH_SECRET` được giữ để tương thích cấu hình; phiên đăng nhập hiện dùng token ngẫu nhiên lưu hash trong DB, không dùng JWT ký bằng giá trị này.
 
-## 6. Tạo bảng và Admin trên Supabase
+## 6. Tự động tạo bảng và Admin
 
-Trong PowerShell, từ thư mục dự án:
+Không cần chạy lệnh tạo bảng thủ công. Sau khi điền biến môi trường và deploy ở bước 7, lần khởi động Next server đầu tiên tự:
 
-```powershell
-npm ci
-node scripts/production-db.mjs .env.deploy migrate
-node scripts/production-db.mjs .env.deploy admin
-```
+1. Kết nối Direct, lấy khóa migration trong PostgreSQL để các instance không tạo bảng đồng thời.
+2. Áp dụng SQL trong thư mục `drizzle/`, tạo 16 bảng ứng dụng và lịch sử `drizzle.__drizzle_migrations`.
+3. Tạo tài khoản Admin nếu có `ADMIN_EMAIL` và `ADMIN_PASSWORD` (ít nhất 12 ký tự); giữ nguyên tài khoản/mật khẩu đã tồn tại.
+4. Ghi log `[database] Ready: ...` rồi mới nhận request.
 
-Script chọn kết nối quản trị trong `.env.deploy`, không in URI/mật khẩu. `migrate` áp dụng migrations; `admin` chỉ tạo Admin, không tạo sản phẩm mẫu, không đặt lại mật khẩu tài khoản đã tồn tại.
+Restart/redeploy chỉ chạy migration mới, không xóa bảng, không seed sản phẩm và không reset tồn kho. Giữ migrations trong repository; không sửa SQL đã chạy. `npm run build` không chạy migration; Vercel thực hiện khi Function khởi động, có thể ở request đầu tiên. Nếu kết nối/quyền migration lỗi, server dừng khởi tạo và báo lỗi trong logs; sửa env/mạng rồi restart/redeploy.
 
-Nếu muốn có 8 sản phẩm minh họa để thử một môi trường staging mới:
+Ứng dụng tạo bảng trong database `postgres` đã có của Supabase, không tự tạo Supabase project, database server hoặc Storage bucket. Bucket ảnh vẫn thiết lập theo bước 4. Với database đã tạo bảng bằng cách khác nhưng không có lịch sử Drizzle, cần kiểm tra baseline; app không xóa bảng để ép khởi tạo.
 
-```powershell
-node scripts/production-db.mjs .env.deploy seed
-```
-
-Không bắt buộc seed khi kinh doanh thật. Vào Admin để tạo danh mục/sản phẩm của bạn. Không chạy bài test database/browser với cấu hình production.
+Muốn dữ liệu minh họa trên staging: sau khi server khởi tạo xong, có thể chạy `node scripts/production-db.mjs .env.deploy seed`. Không chạy test database/browser trên production. `AUTO_MIGRATE=false` dành cho đội vận hành muốn chạy migration riêng bằng `node scripts/production-db.mjs .env.deploy migrate`.
 
 **Ảnh local cũ:** file trong `uploads/` không đi theo Git. Nếu bạn đưa dữ liệu local lên Supabase, những đường `/api/media/...` cũ không tồn tại trên Vercel. Mở từng sản phẩm trong Admin của bản hosted, tải lại ảnh từ máy, chọn ảnh bìa và lưu. SVG seed nằm trong `public/images` vẫn có trong deploy. Không xóa ảnh cũ khi chưa chắc các đơn hàng lịch sử còn dùng chúng hay không.
 
@@ -119,8 +116,8 @@ Không bắt buộc seed khi kinh doanh thật. Vào Admin để tạo danh mụ
 2. Framework Preset: **Next.js**; Root Directory: thư mục chứa `package.json` (repo hiện tại là root).
 3. Node.js: **22.x**. Build command `npm run build`, install command `npm ci --cache /tmp/npm-cache`. Để Output Directory mặc định, không nhập `.next/standalone`.
 4. `vercel.json` đã có install command Linux để không dùng đường cache ổ D trong `.npmrc`.
-5. Thêm Environment Variables cho **Production** theo bảng trên. Không cần ADMIN_PASSWORD tồn tại trong Function sau khi Admin đã được tạo; chỉ script bootstrap dùng nó. Không thêm `NODE_ENV=development`, `UPLOAD_DIR` Windows hoặc mật khẩu PostgreSQL local.
-6. `DIRECT_DATABASE_URL` chỉ cần ở máy chạy migrations; không bắt buộc đưa lên Vercel runtime. Không chạy migration tự động trong build preview.
+5. Thêm Environment Variables cho **Production** theo bảng trên. Cần ADMIN_EMAIL/ADMIN_PASSWORD ở lần khởi động đầu để tự tạo Admin; có thể bỏ ADMIN_PASSWORD rồi redeploy sau khi tạo xong. Không thêm `NODE_ENV=development`, `UPLOAD_DIR` Windows hoặc mật khẩu PostgreSQL local.
+6. `DATABASE_URL` dùng Direct và `AUTO_MIGRATE=true` phải có trên runtime. Nếu dùng `DIRECT_DATABASE_URL`, cũng thêm biến này trên runtime và trỏ đúng database. Preview phải dùng database riêng.
 7. Chọn vùng Functions gần Supabase nếu gói cho phép; Deploy.
 
 Vercel tự khởi chạy Next Functions; không chạy `npm start` hoặc worker Node liên tục ở đây. Endpoint cron đã hỗ trợ GET có `Authorization: Bearer CRON_SECRET`. Vercel tự gửi header khi đặt biến `CRON_SECRET`; lịch chỉ chạy trên production deployment. [Vercel Cron](https://vercel.com/docs/cron-jobs).
@@ -149,14 +146,14 @@ Nếu tên URL Vercel thực tế khác dự kiến, cập nhật APP_URL theo U
 
 ## 10. Cập nhật và khắc phục lỗi
 
-Thay source → chạy test/build local → push Git. Nếu có migration mới, backup Supabase và chạy `production-db ... migrate` bằng máy quản trị trước khi deploy code yêu cầu cột mới. Dùng Preview với database/bucket riêng; không cho preview ghi lên database bán hàng.
+Thay source → chạy test/build local → push Git. Nếu có migration mới, backup Supabase trước khi deploy; server tự áp dụng khi khởi động. Kiểm tra tương thích với instance cũ đang chạy, dùng maintenance window nếu thay đổi phá vỡ schema. Dùng Preview với database/bucket riêng; không cho preview ghi lên database bán hàng.
 
 | Hiện tượng                     | Kiểm tra                                                                                      |
 | ------------------------------ | --------------------------------------------------------------------------------------------- |
 | Build fail vì cron             | Gói hỗ trợ cron mỗi phút; không dùng nguyên cấu hình Pro trên Hobby                           |
 | Không kết nối PostgreSQL       | URI lấy từ Connect, user pooler có PROJECT-REF, mật khẩu URL-encode, direct IPv6/session IPv4 |
-| Too many connections           | DATABASE_URL transaction pooler; runtime đã đặt pool max=1                                    |
-| Relation/column does not exist | Migrations trên đúng Supabase project đã chạy chưa                                            |
+| Too many connections           | Direct có giới hạn kết nối; runtime Vercel pool max=1, kiểm tra concurrency/gói DB            |
+| Relation/column does not exist | Kiểm tra log [database] Ready, AUTO_MIGRATE và hai URI có cùng database                       |
 | 400 Nguồn yêu cầu không hợp lệ | APP_URL có đúng domain đang mở; redeploy sau sửa env                                          |
 | 413 khi upload                 | Giảm mỗi ảnh dưới 3 MB; mỗi request chỉ chứa một file                                         |
 | Không lưu được ảnh             | MEDIA_STORAGE=supabase, service_role đúng, bucket tồn tại/public                              |

@@ -27,10 +27,12 @@ Node.js 22+, PostgreSQL 18. Sao chép `.env.example` thành `.env`, cấu hình 
 ```powershell
 npm ci
 npm run db:setup
-npm run db:migrate
-npm run db:seed
 npm run dev
+# Tùy chọn: sau khi server tạo bảng, mở terminal khác để thêm dữ liệu minh họa
+# npm run db:seed
 ```
+
+`AUTO_MIGRATE=true` (mặc định) tự tạo/cập nhật 16 bảng khi server khởi động, giữ dữ liệu và tạo Admin từ ADMIN_EMAIL/ADMIN_PASSWORD. Với Supabase Direct cổng 5432, chỉ cần điền DATABASE_URL rồi chạy server; bỏ qua db:setup. Direct yêu cầu IPv6 hoặc IPv4 add-on. Xem hướng dẫn deploy để cấu hình đầy đủ.
 
 `db:setup` tạo database nếu chưa tồn tại và sinh thông tin Admin/cron còn thiếu. Seed idempotent, không đặt lại mật khẩu hoặc tồn kho đã có. Cache npm được đặt trên ổ D qua `.npmrc`; sửa đường dẫn này nếu dùng máy khác. Không chạy `scripts/check-local.ts` trên máy khác: đó là tiện ích phục hồi kết nối từ tệp yêu cầu do chủ dự án cung cấp.
 

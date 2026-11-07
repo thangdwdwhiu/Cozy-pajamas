@@ -18,6 +18,7 @@ import {
 import { checkout, checkoutSchema, expireOrders, orderAccess, transition } from '@/lib/commerce';
 import { paymentSchema, processPayment, verifySignature } from '@/lib/payments';
 import { assertLivePaymentConfig } from '@/lib/payment-config';
+import {publicApiError} from '@/lib/api-errors';
 export const runtime = 'nodejs';
 const safeUser = {
   id: s.users.id,
@@ -393,16 +394,8 @@ async function handle(req: NextRequest, { params }: { params: Promise<{ path: st
     }
     return NextResponse.json({ error: 'Không tìm thấy' }, { status: 404 });
   } catch (error) {
-    const message =
-      error instanceof z.ZodError
-        ? 'Dữ liệu không hợp lệ. Vui lòng kiểm tra các trường.'
-        : error instanceof Error && !('code' in error)
-          ? error.message
-          : 'Không thể xử lý yêu cầu. Vui lòng thử lại.';
-    return NextResponse.json(
-      { error: message },
-      { status: message.includes('quyền') ? 403 : message.includes('đăng nhập') ? 401 : 400 },
-    );
+    const result=publicApiError(error);
+    return NextResponse.json(result.body,{status:result.status});
   }
 }
 export const GET = handle;

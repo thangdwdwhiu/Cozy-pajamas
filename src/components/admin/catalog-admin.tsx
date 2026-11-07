@@ -19,7 +19,14 @@ import {
   Save,
   Pencil,
 } from 'lucide-react';
-import { api, money } from '../store';
+import { api, money, ApiError } from '../store';
+import {
+  productFormSchema,
+  parseVnd,
+  validationFields,
+  editorFieldErrors,
+  type FieldErrors,
+} from '@/lib/catalog-validation';
 type Row = Record<string, any>;
 type Props = {
   tab: string;
@@ -295,7 +302,25 @@ function ProductEditor({
     [price, setPrice] = useState(''),
     [color, setColor] = useState(''),
     [stock, setStock] = useState('0'),
-    [sizes, setSizes] = useState(['S', 'M', 'L']);
+    [sizes, setSizes] = useState(['S', 'M', 'L']),
+    [fieldErrors, setFieldErrors] = useState<FieldErrors>({}),
+    [submitError, setSubmitError] = useState('');
+  const errorSummaryRef = useRef<HTMLDivElement>(null);
+  function fieldError(field: string) {
+    return fieldErrors[field] ? (
+      <small id={'error-' + field} className="field-error">
+        {fieldErrors[field]}
+      </small>
+    ) : null;
+  }
+  function showErrors(fields: FieldErrors, message = '') {
+    setFieldErrors(editorFieldErrors(fields));
+    setSubmitError(message);
+    requestAnimationFrame(() => {
+      errorSummaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      errorSummaryRef.current?.focus();
+    });
+  }
   const inputRef = useRef<HTMLInputElement>(null);
   const locked = saving || uploading;
   async function upload(files: File[]) {
@@ -346,45 +371,46 @@ function ProductEditor({
   }
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (!images.length) {
-      setUploadError('Vui lòng tải ít nhất một ảnh sản phẩm.');
+    const payload = {
+      id: product?.id,
+      name,
+      description,
+      material,
+      categoryId,
+      images,
+      active,
+      featured,
+      ...(!product
+        ? {
+            initialVariants: sizes.map((size) => ({
+              color,
+              size,
+              price: parseVnd(price),
+              stock: stock.trim() === '' ? Number.NaN : Number(stock),
+            })),
+          }
+        : {}),
+    };
+    const validation = productFormSchema.safeParse(payload);
+    if (!validation.success) {
+      showErrors(validationFields(validation.error));
       return;
     }
-    if (!product && !sizes.length) {
-      onError('Chọn ít nhất một kích thước.');
-      return;
-    }
+    setFieldErrors({});
+    setSubmitError('');
     setSaving(true);
     try {
-      await api('admin/product', {
-        id: product?.id,
-        name,
-        description,
-        material,
-        categoryId,
-        images,
-        active,
-        featured,
-        ...(!product
-          ? {
-              initialVariants: sizes.map((size) => ({
-                color,
-                size,
-                price: Number(price),
-                stock: Number(stock),
-              })),
-            }
-          : {}),
-      });
+      await api('admin/product', validation.data);
       await onSaved();
     } catch (e) {
-      onError((e as Error).message);
+      if (e instanceof ApiError && Object.keys(e.fieldErrors).length) showErrors(e.fieldErrors);
+      else showErrors({}, (e as Error).message);
     } finally {
       setSaving(false);
     }
   }
   return (
-    <form className="product-editor" onSubmit={submit}>
+    <form className="product-editor" onSubmit={submit} noValidate>
       <div className="editor-top">
         <button type="button" className="back-link" onClick={onCancel} disabled={locked}>
           <ArrowLeft size={17} />
@@ -400,6 +426,18 @@ function ProductEditor({
           </button>
         </div>
       </div>
+      {(submitError || Object.keys(fieldErrors).length > 0) && (
+        <div className="validation-summary" ref={errorSummaryRef} tabIndex={-1} role="alert">
+          <strong>Chưa thể lưu sản phẩm</strong>
+          {submitError && <p>{submitError}</p>}
+          <ul>
+            {[...new Set(Object.values(fieldErrors))].map((message) => (
+              <li key={message}>{message}</li>
+            ))}
+          </ul>
+          <p>Thông tin và ảnh đã nhập vẫn được giữ lại. Sửa các mục bên dưới rồi lưu lại.</p>
+        </div>
+      )}
       <div className="editor-grid">
         <div>
           <section className="editor-card">
@@ -414,6 +452,9 @@ function ProductEditor({
               Tên sản phẩm{' '}
               <input
                 name="name"
+                aria-label="Tên sản phẩm"
+                aria-invalid={!!fieldErrors.name}
+                aria-describedby={fieldErrors.name ? 'error-name' : undefined}
                 required
                 minLength={3}
                 maxLength={150}
@@ -421,11 +462,14 @@ function ProductEditor({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
+              {fieldError('name')}
             </label>
             <label className="field">
               Chất liệu
               <input
                 name="material"
+                aria-label="Chất liệu"
+                aria-invalid={!!fieldErrors.material}
                 required
                 minLength={2}
                 maxLength={100}
@@ -433,11 +477,14 @@ function ProductEditor({
                 value={material}
                 onChange={(e) => setMaterial(e.target.value)}
               />
+              {fieldError('material')}
             </label>
             <label className="field">
               Mô tả sản phẩm
               <textarea
                 name="description"
+                aria-invalid={!!fieldErrors.description}
+                aria-label="Mô tả sản phẩm"
                 required
                 minLength={10}
                 maxLength={4000}
@@ -446,6 +493,7 @@ function ProductEditor({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
+              {fieldError('description')}
             </label>
           </section>
           <section className="editor-card">
@@ -491,6 +539,7 @@ function ProductEditor({
                 {uploadError}
               </p>
             )}
+            {fieldError('images')}
             <div className="image-manager">
               {images.map((url, i) => (
                 <div className="managed-image" key={url}>
@@ -554,8 +603,11 @@ function ProductEditor({
                 <label className="field">
                   Giá bán (₫)
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     name="price"
+                    aria-invalid={!!fieldErrors.price}
+                    aria-label="Giá bán (₫)"
                     min={1000}
                     max={100000000}
                     required
@@ -563,17 +615,22 @@ function ProductEditor({
                     onChange={(e) => setPrice(e.target.value)}
                     placeholder="389000"
                   />
+                  <small>Nhập 389000 hoặc 389.000 (đồng).</small>
+                  {fieldError('price')}
                 </label>
                 <label className="field">
                   Màu sắc
                   <input
                     name="color"
+                    aria-invalid={!!fieldErrors.color}
+                    aria-label="Màu sắc"
                     required
                     maxLength={50}
                     value={color}
                     onChange={(e) => setColor(e.target.value)}
                     placeholder="Hồng phấn"
                   />
+                  {fieldError('color')}
                 </label>
               </div>
               <span className="field-label">Kích thước</span>
@@ -595,10 +652,13 @@ function ProductEditor({
                   </button>
                 ))}
               </div>
+              {fieldError('sizes')}
               <label className="field">
                 Tồn kho ban đầu cho mỗi kích thước
                 <input
                   name="stock"
+                  aria-invalid={!!fieldErrors.stock}
+                  aria-label="Tồn kho ban đầu cho mỗi kích thước"
                   type="number"
                   min={0}
                   max={100000}
@@ -606,6 +666,7 @@ function ProductEditor({
                   value={stock}
                   onChange={(e) => setStock(e.target.value)}
                 />
+                {fieldError('stock')}
               </label>
             </section>
           ) : (
@@ -626,6 +687,7 @@ function ProductEditor({
               <select
                 aria-label="Danh mục sản phẩm"
                 name="categoryId"
+                aria-invalid={!!fieldErrors.categoryId}
                 required
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
@@ -639,6 +701,7 @@ function ProductEditor({
                   </option>
                 ))}
               </select>
+              {fieldError('categoryId')}
             </label>
             <small>Danh mục giúp sản phẩm xuất hiện đúng nơi khách hàng tìm kiếm.</small>
             {!categories.length && (
@@ -687,7 +750,7 @@ function ProductEditor({
             <small>{material || 'Chất liệu sản phẩm'}</small>
             <h3>{name || 'Tên sản phẩm'}</h3>
             <p>{categories.find((c) => c.id === categoryId)?.name ?? 'Chưa chọn danh mục'}</p>
-            {price && <strong>{money(Number(price))}</strong>}
+            {price && Number.isFinite(parseVnd(price)) && <strong>{money(parseVnd(price))}</strong>}
           </section>
         </aside>
       </div>

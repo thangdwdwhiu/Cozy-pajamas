@@ -57,3 +57,12 @@
 - Ảnh kiểm tra mới: docs/screenshots/admin-redesign.png, admin-products.png, admin-product-editor.png, admin-mobile.png. Fixture QA browser tạo được dọn theo ID; không xóa sản phẩm do người dùng tạo.
 
 Đọc README, tài liệu PAYMENTS, DEPLOYMENT trước. Không seed reset hay xóa dữ liệu. Giữ PAYMENT_LIVE_ENABLED=false cho đến khi chủ cửa hàng đồng ý. Dùng database test riêng cho các bài cạnh tranh. Không in .env. Tài khoản admin nằm trong .env local.
+
+# Cập nhật sửa tạo sản phẩm và tự khởi tạo database — 07/11/2026
+
+- Thay thông báo validation chung bằng thông báo tiếng Việt theo trường ở API và Admin. Dùng chung quy tắc validation; chấp nhận giá VND có dấu phân cách hàng nghìn; giữ bản nháp và ảnh khi lỗi.
+- Next instrumentation tự chạy migrations trước khi phục vụ request; khóa PostgreSQL chống chạy đồng thời, kiểm tra checksum migration cũ và bootstrap Admin mà không đổi mật khẩu đã có. Không seed hay reset dữ liệu.
+- Đóng gói SQL migrations cho standalone/Vercel/Docker. Bổ sung compose.supabase.yaml cho VPS kết nối Supabase Direct, không ghi đè URI sang DB nội bộ.
+- Đã qua 18 bài test, build production và kiểm thử Admin trên Edge: lỗi mô tả, HTTP 422 theo trường, sửa rồi lưu thành công với nhiều ảnh và giá 350.000.
+- Đã chạy Next production với database local trống riêng: tự tạo 16 bảng + Admin, trả HTTP thành công, không chạy migration thủ công. `npm run test:startup` tái hiện kiểm tra này sau build.
+- Chưa triển khai hay kiểm chứng kết nối Supabase/Vercel/VPS thật. Cấu hình hiện tại trong .env vẫn trỏ PostgreSQL local. Tài liệu đã chuyển hướng dẫn sang Direct cổng 5432 và AUTO_MIGRATE.

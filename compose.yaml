@@ -19,6 +19,7 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://cozy:${POSTGRES_PASSWORD}@db:5432/cozy_pajamas
+      DIRECT_DATABASE_URL: ""
     ports:
       - "127.0.0.1:3000:3000"
     volumes:

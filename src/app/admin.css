@@ -1075,3 +1075,32 @@
   padding: 0 17px 36px;
   margin: 0;
 }
+.validation-summary {
+  background: #fff4f5;
+  border: 1px solid #e7b9c3;
+  border-radius: 8px;
+  padding: 18px 22px;
+  margin: 0 0 24px;
+  color: #923f56;
+}
+.validation-summary p {
+  color: #923f56;
+  font-size: 11px;
+  margin: 7px 0;
+}
+.validation-summary ul {
+  margin: 9px 0;
+  padding-left: 20px;
+  font-size: 12px;
+}
+.field-error {
+  display: block !important;
+  color: #ad3e59 !important;
+  font-size: 11px !important;
+  line-height: 1.65;
+  margin-top: 5px;
+}
+.admin [aria-invalid='true'] {
+  border-color: #ce6b83 !important;
+  background: #fffafb !important;
+}

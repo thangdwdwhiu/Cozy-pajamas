@@ -7,6 +7,7 @@ if (mode === 'start') {
   if (!existsSync('.next/standalone/server.js')) throw Error('Run npm run build before npm start');
   cpSync('public', '.next/standalone/public', { recursive: true });
   cpSync('.next/static', '.next/standalone/.next/static', { recursive: true });
+  cpSync('drizzle', '.next/standalone/drizzle', { recursive: true });
 }
 const appArgs =
   mode === 'start' ? ['.next/standalone/server.js'] : ['node_modules/next/dist/bin/next', mode];

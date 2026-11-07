@@ -77,6 +77,16 @@ export const labels: Record<string, string> = {
   REJECTED: 'Từ chối',
   RECEIVED: 'Đã nhận hàng trả',
 };
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public fieldErrors: Record<string, string> = {},
+    public status = 400,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
 export async function api(path: string, body?: unknown, token?: string) {
   const response = await fetch('/api/' + path, {
     method: body === undefined ? 'GET' : 'POST',
@@ -84,7 +94,8 @@ export async function api(path: string, body?: unknown, token?: string) {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = await response.json();
-  if (!response.ok) throw Error(data.error ?? 'Không thể kết nối');
+  if (!response.ok)
+    throw new ApiError(data.error ?? 'Không thể kết nối', data.fieldErrors ?? {}, response.status);
   return data;
 }
 export function Field({

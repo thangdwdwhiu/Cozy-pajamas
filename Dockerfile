@@ -15,6 +15,7 @@ RUN addgroup -S cozy && adduser -S cozy -G cozy && mkdir /app/uploads && chown c
 COPY --from=build --chown=cozy:cozy /app/.next/standalone ./
 COPY --from=build --chown=cozy:cozy /app/.next/static ./.next/static
 COPY --from=build --chown=cozy:cozy /app/public ./public
+COPY --from=build --chown=cozy:cozy /app/drizzle ./drizzle
 USER cozy
 EXPOSE 3000
 CMD ["node","server.js"]

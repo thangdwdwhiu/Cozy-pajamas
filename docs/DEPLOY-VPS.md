@@ -97,12 +97,11 @@ docker compose config --quiet
 docker compose build app tools
 docker compose up -d db
 docker compose ps
-docker compose run --rm tools npm run db:migrate
-docker compose run --rm tools npx tsx scripts/create-admin.ts
+docker compose up -d app worker
 ```
 
 - Service db tạo database `cozy_pajamas` lần đầu vào volume mới.
-- Service tools dùng cùng phiên bản source và mạng db để chạy migrations; tự đợi DB healthy.
+- App tự chạy migrations trước khi nhận request (AUTO_MIGRATE mặc định bật), tự tạo Admin từ ADMIN_EMAIL/ADMIN_PASSWORD; xem log `[database] Ready`. Tools chỉ dành cho vận hành tùy chọn.
 - Admin bootstrap chỉ tạo tài khoản thiếu, không đổi mật khẩu tài khoản có sẵn.
 - Không cần `npm run db:setup` trong Docker, PostgreSQL image đã tạo database.
 
@@ -193,7 +192,6 @@ cd /srv/cozy
 git rev-parse HEAD
 git pull --ff-only
 docker compose build app tools
-docker compose run --rm tools npm run db:migrate
 docker compose up -d app worker
 docker compose logs --tail=80 app worker
 ```
@@ -204,7 +202,7 @@ Ghi lại commit cũ trước khi cập nhật. Migration cần tương thích k
 
 ## 11. Nếu muốn chạy Node trực tiếp thay vì Docker
 
-Repository có `deploy/cozy.service` cho systemd. Cách này đòi hỏi bạn tự cài Node 22, PostgreSQL, tạo user Linux `cozy`, database role riêng và đưa source vào `/srv/cozy`. Sau khi đặt `.env` (DATABASE_URL dùng localhost), chạy `npm ci --cache /srv/cozy/.cache/npm`, migrations, tạo Admin, build. Service chạy `scripts/run.mjs start`, gồm web và worker. Đảm bảo `/usr/bin/node` đúng vị trí binary và user cozy được đọc source, ghi uploads và .next/standalone.
+Repository có `deploy/cozy.service` cho systemd. Cách này đòi hỏi bạn tự cài Node 22, PostgreSQL, tạo user Linux `cozy`, database role riêng và đưa source vào `/srv/cozy`. Sau khi đặt `.env` (DATABASE_URL dùng localhost), chạy `npm ci --cache /srv/cozy/.cache/npm`, build rồi start; server tự chạy migrations và tạo Admin từ biến môi trường. Service chạy `scripts/run.mjs start`, gồm web và worker. Đảm bảo `/usr/bin/node` đúng vị trí binary và user cozy được đọc source, ghi uploads và .next/standalone.
 
 ```bash
 sudo cp deploy/cozy.service /etc/systemd/system/cozy.service
@@ -223,8 +221,34 @@ Chỉ chọn **một** cách chạy trên port 3000: Docker hoặc systemd. Cadd
 | 502                               | app đã ready chưa, curl loopback, container logs                                            |
 | Password authentication failed    | POSTGRES_PASSWORD đúng role đã khởi tạo; không chỉ sửa .env rồi kỳ vọng DB tự đổi           |
 | Permission denied upload          | Volume /app/uploads và quyền user cozy trong container                                      |
-| Migration missing column          | Chạy tools migrate với image mới, đúng DB                                                   |
+| Migration missing column          | Kiểm tra AUTO_MIGRATE và log khởi động, đúng DB                                             |
 | Admin báo nguồn không hợp lệ      | APP_URL khớp domain HTTPS đang mở, recreate app sau sửa                                     |
 | Worker 401 liên tục               | CRON_SECRET giống nhau giữa app/worker, recreate cả hai                                     |
 | Ảnh local biến mất sau chuyển VPS | Copy/migrate uploads có chủ đích hoặc upload lại ảnh qua Admin; Git không mang theo uploads |
 | Build thiếu RAM                   | Build trên máy CI có đủ RAM hoặc nâng tài nguyên; không xóa database để giải phóng RAM      |
+
+## VPS dùng Supabase Direct thay cho PostgreSQL trong Docker
+
+Dùng file riêng `compose.supabase.yaml` (không ghép với compose.yaml vì file mặc định ghi đè DATABASE_URL sang database nội bộ). Trong `.env`:
+
+```dotenv
+DATABASE_URL=postgresql://postgres:MAT_KHAU_DA_ENCODE@db.PROJECT_REF.supabase.co:5432/postgres
+DIRECT_DATABASE_URL=
+AUTO_MIGRATE=true
+APP_URL=https://shop.tenmiencuaban.vn
+ADMIN_EMAIL=EMAIL_QUAN_TRI
+ADMIN_PASSWORD=MAT_KHAU_MANH_IT_NHAT_12_KY_TU
+MEDIA_STORAGE=supabase
+SUPABASE_URL=https://PROJECT_REF.supabase.co
+SUPABASE_STORAGE_BUCKET=product-images
+SUPABASE_SERVICE_ROLE_KEY=KHOA_SERVER
+```
+
+Thiết lập bucket/khóa Storage theo [hướng dẫn Supabase](DEPLOY-VERCEL-SUPABASE.md). Có thể chọn MEDIA_STORAGE=local để dùng volume ảnh VPS. Cấu hình SePay theo [PAYMENTS.md](PAYMENTS.md). VPS và mạng container phải kết nối IPv6 tới Supabase Direct hoặc project có IPv4 add-on; xem [Supabase connections](https://supabase.com/docs/guides/database/connecting-to-postgres).
+
+```bash
+docker compose -f compose.supabase.yaml up -d --build
+docker compose -f compose.supabase.yaml logs --tail=80 app
+```
+
+Không cần tạo bảng thủ công: server tự áp dụng migrations và bootstrap Admin trước khi nhận request, giữ dữ liệu khi restart. HTTPS/Caddy vẫn dùng port localhost:3000 như trên. Khi cập nhật/restart/logs luôn thêm `-f compose.supabase.yaml`; backup database qua Supabase/pg_dump và backup volume nếu lưu ảnh local. Không dùng lệnh backup service `db` ở trên vì cấu hình này không chạy PostgreSQL local.

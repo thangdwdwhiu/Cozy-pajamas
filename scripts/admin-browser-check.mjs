@@ -43,7 +43,7 @@ try {
     .getByLabel('Mô tả sản phẩm', { exact: true })
     .fill('Mô tả kiểm thử nhiều ảnh và danh mục sản phẩm.');
   await page.getByLabel('Danh mục sản phẩm', { exact: true }).selectOption(categoryId);
-  await page.getByLabel('Giá bán (₫)', { exact: true }).fill('350000');
+  await page.getByLabel('Giá bán (₫)', { exact: true }).fill('350.000');
   await page.getByLabel('Màu sắc', { exact: true }).fill('Hồng');
   await page.getByLabel('Tồn kho ban đầu cho mỗi kích thước', { exact: true }).fill('3');
   const a = await sharp('public/images/rose.svg').png().toBuffer(),
@@ -59,6 +59,36 @@ try {
   await page.waitForFunction(() => !document.querySelector('.upload-zone.uploading'));
   await page.getByRole('button', { name: 'Đặt ảnh 2 làm ảnh bìa', exact: true }).click();
   assert.equal(await page.getByLabel('Tên sản phẩm', { exact: true }).inputValue(), productName);
+  await page.getByLabel('Mô tả sản phẩm', { exact: true }).fill('ngắn');
+  await page.getByRole('button', { name: 'Tạo sản phẩm', exact: true }).click();
+  await page
+    .locator('.field-error')
+    .filter({ hasText: 'Mô tả sản phẩm cần ít nhất 10 ký tự' })
+    .waitFor();
+  assert.equal(await page.getByLabel('Tên sản phẩm', { exact: true }).inputValue(), productName);
+  await page.getByRole('button', { name: 'Bỏ ảnh 2', exact: true }).waitFor();
+  const invalid = await page.evaluate(async () => {
+    const response = await fetch('/api/admin/product', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'a',
+        description: 'ngắn',
+        material: '',
+        categoryId: '',
+        images: [],
+        active: true,
+        featured: false,
+      }),
+    });
+    return { status: response.status, body: await response.json() };
+  });
+  assert.equal(invalid.status, 422);
+  assert.ok(invalid.body.fieldErrors.description);
+  await page.screenshot({ path: 'docs/screenshots/admin-validation.png', fullPage: true });
+  await page
+    .getByLabel('Mô tả sản phẩm', { exact: true })
+    .fill('Mô tả kiểm thử nhiều ảnh và danh mục sản phẩm.');
   await page.screenshot({ path: 'docs/screenshots/admin-product-editor.png', fullPage: true });
   const response = page.waitForResponse(
     (r) => r.url().endsWith('/api/admin/product') && r.request().method() === 'POST',

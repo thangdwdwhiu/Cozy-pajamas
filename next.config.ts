@@ -2,6 +2,7 @@ import type { NextConfig } from 'next';
 const config: NextConfig = {
   output: 'standalone',
   poweredByHeader: false,
+  outputFileTracingIncludes: { '/*': ['./drizzle/*.sql', './drizzle/meta/_journal.json'] },
   async headers() {
     return [
       {

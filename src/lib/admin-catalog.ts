@@ -1,5 +1,5 @@
 import { eq, sql } from 'drizzle-orm';
-import { z } from 'zod';
+import { productSchema, categorySchema } from './catalog-validation';
 import { db } from '@/db';
 import * as s from '@/db/schema';
 import { validImageUrl } from './media';
@@ -15,27 +15,7 @@ export function slugify(name: string) {
       .slice(0, 100) || 'cozy'
   );
 }
-const productInput = z.object({
-  id: z.string().optional(),
-  name: z.string().trim().min(3).max(150),
-  categoryId: z.string().min(1),
-  description: z.string().trim().min(10).max(4000),
-  material: z.string().trim().min(2).max(100),
-  images: z.array(z.string().refine(validImageUrl, 'Ảnh không hợp lệ')).min(1).max(10),
-  active: z.boolean(),
-  featured: z.boolean(),
-  initialVariants: z
-    .array(
-      z.object({
-        color: z.string().trim().min(1).max(50),
-        size: z.string().min(1).max(10),
-        price: z.number().int().min(1000).max(100000000),
-        stock: z.number().int().min(0).max(100000),
-      }),
-    )
-    .max(50)
-    .optional(),
-});
+const productInput = productSchema(validImageUrl);
 export async function saveProduct(body: unknown, actor: string) {
   const input = productInput.parse(body);
   return db.transaction(async (tx) => {
@@ -97,9 +77,7 @@ export async function saveProduct(body: unknown, actor: string) {
   });
 }
 export async function saveCategory(body: unknown, actor: string) {
-  const input = z
-    .object({ id: z.string().optional(), name: z.string().trim().min(2).max(100) })
-    .parse(body);
+  const input = categorySchema.parse(body);
   return db.transaction(async (tx) => {
     let category;
     if (input.id) {

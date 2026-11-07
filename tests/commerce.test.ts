@@ -16,7 +16,8 @@ const customer = {
   address: '123 Test, phường Test, thành phố Test',
 };
 before(async () => {
-  const url = new URL(process.env.DATABASE_URL!);
+  const url = new URL(process.env.TEST_DATABASE_URL || process.env.DATABASE_URL!);
+  assert.ok(['localhost', '127.0.0.1'].includes(url.hostname), 'Database tests require localhost');
   url.pathname = '/cozy_pajamas_test';
   const admin = new URL(url);
   admin.pathname = '/postgres';
